@@ -19,15 +19,15 @@ import (
 // hardening is broken. Do NOT update the expected values to make the tests
 // pass without a migration plan for all existing tokens and ciphertexts.
 const (
-	// TestVectorRootSecret is a fixed, public, production-shaped root secret
-	// (openssl rand -hex 32 output shape). It is not a real secret.
-	TestVectorRootSecret = "8aac552286da2f3495aead89fb05136a84dfa9827a9a801fa0ea19ff3b361026"
+	// TestVectorRootSecret is the fixed, public, canonical cross-repo test
+	// root secret agreed in task 03. It is not a real secret.
+	TestVectorRootSecret = "sqle-jwt-secret-fix-crossrepo-vector-0001"
 
 	// TestVectorJWTKeyHex = HKDF-SHA256(root, salt=nil, info=InfoJWT, L=32)
-	TestVectorJWTKeyHex = "46c01319af726406080a5db116914a81ef436dcab291ac34005f7615f02ddd5f"
+	TestVectorJWTKeyHex = "7a9fb850c7f34b36751da8b5273142c34d8c18b95053dcd3ad34fa7dbad20bfc"
 
 	// TestVectorAESKeyHex = HKDF-SHA256(root, salt=nil, info=InfoAES, L=32)
-	TestVectorAESKeyHex = "4bd1dc96e284cf39a3106bcddb6e6011d31a5a6f9cdffceef4d9bfd52166a7db"
+	TestVectorAESKeyHex = "fb06443d1eb9ba92ce6d8becc77ccaf3dfe7670d54564292f9e263a61902e6fe"
 )
 
 func TestDeriveKeyTestVectors(t *testing.T) {
