@@ -1,8 +1,11 @@
 package v1
 
 import (
+	"errors"
 	"fmt"
 	"strings"
+
+	"github.com/actiontech/dms/pkg/dms-common/pkg/secretkey"
 )
 
 // login config
@@ -35,10 +38,21 @@ var (
 	CurrentGroupVersion = GroupV1
 )
 
-func ResetJWTSigningKey(val string) {
-	if val != "" {
-		JwtSigningKey = []byte(val)
+// ResetJWTSigningKey replaces the JWT signing key with a 32-byte key derived
+// from the given root secret via HKDF-SHA256 (domain InfoJWT), instead of
+// using the raw configured secret. See CVE-2025-15107 / GHSA-43h9-hc38-qph5.
+func ResetJWTSigningKey(val string) error {
+	if val == "" {
+		return errors.New("reset jwt signing key: empty secret_key")
 	}
+
+	derivedKey, err := secretkey.DeriveKey(val, secretkey.InfoJWT)
+	if err != nil {
+		return err
+	}
+
+	JwtSigningKey = derivedKey
+	return nil
 }
 
 func GetUserOpPermissionRouter(userUid string) string {

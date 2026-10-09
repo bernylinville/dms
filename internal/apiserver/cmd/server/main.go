@@ -19,6 +19,7 @@ import (
 	"github.com/actiontech/dms/pkg/dms-common/pkg/aes"
 	"github.com/actiontech/dms/pkg/dms-common/pkg/http"
 	pkgLog "github.com/actiontech/dms/pkg/dms-common/pkg/log"
+	"github.com/actiontech/dms/pkg/dms-common/pkg/secretkey"
 	"github.com/actiontech/dms/pkg/rand"
 
 	utilIo "github.com/actiontech/dms/pkg/dms-common/pkg/io"
@@ -52,6 +53,13 @@ func run(logger utilLog.Logger, opts *conf.DMSOptions) error {
 	err := rand.InitSnowflake(opts.ID)
 	if nil != err {
 		return fmt.Errorf("failed to Init snowflake: %v", err)
+	}
+
+	// fail-safe for CVE-2025-15107 / GHSA-43h9-hc38-qph5: a missing or weak
+	// secret_key must abort startup instead of silently running on publicly
+	// known default JWT/AES keys that allow forged admin tokens.
+	if err := secretkey.Validate(opts.SecretKey); err != nil {
+		return fmt.Errorf("refusing to start: %v. Set dms.secret_key in the config to at least %d random bytes (e.g. openssl rand -hex 32). Running with an empty or weak secret_key would fall back to publicly known default keys and allow authentication bypass (CVE-2025-15107 / GHSA-43h9-hc38-qph5)", err, secretkey.MinRootSecretLength)
 	}
 
 	// reset jwt singing key, default dms token
