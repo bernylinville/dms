@@ -1480,7 +1480,7 @@ func (cu *CloudbeaverUsecase) operateConnection(ctx context.Context, cloudbeaver
 
 	for _, dbService := range dbServiceMap {
 		if cloudbeaverConnection, ok := cloudbeaverConnectionMap[getDBPrimaryKey(dbService.UID, dbService.AccountPurpose, dmsUser.UID)]; ok {
-			if cloudbeaverConnection.DMSDBServiceFingerprint != cu.dbServiceUsecase.GetDBServiceFingerprint(dbService) {
+			if cloudbeaverConnection.DMSDBServiceFingerprint != cu.cloudbeaverConnectionFingerprint(dbService) {
 				updateConnections = append(updateConnections, &CloudbeaverConnection{DMSDBServiceID: dbService.UID, CloudbeaverConnectionID: cloudbeaverConnection.CloudbeaverConnectionID, Purpose: dbService.AccountPurpose, DMSUserId: dmsUser.UID})
 			}
 		} else {
@@ -1649,7 +1649,7 @@ func (cu *CloudbeaverUsecase) createCloudbeaverConnection(ctx context.Context, c
 	err = cu.repo.UpdateCloudbeaverConnectionCache(ctx, &CloudbeaverConnection{
 		DMSDBServiceID:          dbService.UID,
 		DMSUserId:               userId,
-		DMSDBServiceFingerprint: cu.dbServiceUsecase.GetDBServiceFingerprint(dbService),
+		DMSDBServiceFingerprint: cu.cloudbeaverConnectionFingerprint(dbService),
 		Purpose:                 dbService.AccountPurpose,
 		CloudbeaverConnectionID: resp.Connection.ID,
 	})
@@ -1696,7 +1696,7 @@ func (cu *CloudbeaverUsecase) updateCloudbeaverConnection(ctx context.Context, c
 	err = cu.repo.UpdateCloudbeaverConnectionCache(ctx, &CloudbeaverConnection{
 		DMSDBServiceID:          dbService.UID,
 		DMSUserId:               userId,
-		DMSDBServiceFingerprint: cu.dbServiceUsecase.GetDBServiceFingerprint(dbService),
+		DMSDBServiceFingerprint: cu.cloudbeaverConnectionFingerprint(dbService),
 		Purpose:                 dbService.AccountPurpose,
 		CloudbeaverConnectionID: resp.Connection.ID,
 	})
@@ -1800,10 +1800,31 @@ func (cu *CloudbeaverUsecase) GenerateCloudbeaverConnectionParams(dbService *DBS
 	return resp, err
 }
 
+// cloudbeaverConnectionParamsVersion tracks DMS-generated CloudBeaver
+// connection parameters (driver properties, e.g. sessionVariables). Bump it
+// once when those parameters change so every cached fingerprint mismatches
+// and each existing connection is refreshed via updateConnection on the
+// user's next sync pass.
+const cloudbeaverConnectionParamsVersion = "v2-max-execution-time"
+
+// cloudbeaverConnectionFingerprint wraps GetDBServiceFingerprint with
+// cloudbeaverConnectionParamsVersion. The sync compare and both cache stores
+// must use this wrapper (never the raw service fingerprint) so parameter
+// changes propagate to existing connections.
+func (cu *CloudbeaverUsecase) cloudbeaverConnectionFingerprint(dbService *DBService) string {
+	return cloudbeaverConnectionParamsVersion + ":" + cu.dbServiceUsecase.GetDBServiceFingerprint(dbService)
+}
+
 func (cu *CloudbeaverUsecase) fillMySQLParams(config map[string]interface{}) error {
 	config["driverId"] = "mysql:mysql8"
 	// https://github.com/actiontech/dms-ee/issues/276
-	config["properties"] = map[string]interface{}{"allowPublicKeyRetrieval": "TRUE"}
+	// pukka: sessionVariables runs SET SESSION max_execution_time on every
+	// physical connection, enforcing a 120s server-side cap on read-only
+	// SELECT from the SQL console (times out with 3024, connection survives).
+	config["properties"] = map[string]interface{}{
+		"allowPublicKeyRetrieval": "TRUE",
+		"sessionVariables":        "max_execution_time=120000",
+	}
 	return nil
 }
 

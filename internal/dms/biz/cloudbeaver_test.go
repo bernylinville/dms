@@ -72,6 +72,11 @@ func Test_GenerateCloudbeaverConnectionParams_PolarDB(t *testing.T) {
 			if got := props["allowPublicKeyRetrieval"]; got != tc.wantAllowPublicKeyRetVal {
 				t.Errorf("allowPublicKeyRetrieval = %v, want %v", got, tc.wantAllowPublicKeyRetVal)
 			}
+			// pukka: every MySQL-family connection carries the server-side
+			// SELECT cap (Connector/J sessionVariables, 120s, see fillMySQLParams).
+			if got := props["sessionVariables"]; got != "max_execution_time=120000" {
+				t.Errorf("sessionVariables = %v, want max_execution_time=120000", got)
+			}
 		})
 	}
 }
